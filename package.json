@@ -1,0 +1,22 @@
+{
+  "name": "ssh-agent",
+  "version": "0.0.0",
+  "description": "ssh-agent",
+  "main": "agent.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ssh",
+    "ssh-agent",
+    "rsa"
+  ],
+  "author": "Francois Leurent <131.js@cloudyks.org>",
+  "license": "ISC",
+  "dependencies": {
+    "uclass": "~2.0.1",
+    "nyks": "~1.0.1",
+    "mout": "~0.11.0",
+    "node-rsa": "~0.2.25"
+  }
+}
