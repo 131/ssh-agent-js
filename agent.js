@@ -6,7 +6,6 @@ var Class = require('uclass');
 var md5 = require('nyks/crypt/md5');
 var openssh2pem = require('nyks/crypt/openssh2pem');
 var pemme = require('nyks/crypt/pemme');
-var forIn = require('mout/object/forIn');
 var NodeRSA = require('node-rsa');
 
 
@@ -25,7 +24,6 @@ var PROTOCOL = {
   SSH_AGENT_FAILURE: 5,
   SSH_AGENT_SUCCESS: 6
 };
-
 
 
 
@@ -227,7 +225,7 @@ var Agent = new Class({
     var self = this, type = 'ssh-rsa';
     this.list_keys(function(err, keys){
       if(! (key_id in keys))
-        forIn(keys, function(v, k) { if (v.comment == key_id) key_id = k });
+        Object.keys(keys).forEach(function(k){ if (keys[k].comment == key_id) key_id = k });
 
       var key = keys[key_id];
       if(!key)
