@@ -15,7 +15,9 @@
   "license": "ISC",
   "dependencies": {
     "uclass": "~2.0.1",
-    "nyks": "~1.0.1",
-    "node-rsa": "~0.2.25"
+    "nyks": "~1.0.2",
+    "node-rsa": "~0.2.25",
+    "node-jsbn": "*",
+    "asn1": "0.2.2"
   }
 }

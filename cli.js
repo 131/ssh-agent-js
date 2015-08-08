@@ -1,6 +1,6 @@
 var fs = require('fs');
 
-var Agent = require('./agent');
+var Agent = require('./lib/client');
 
 var agent = new Agent();
 
@@ -14,7 +14,19 @@ agent.list_keys(function(err, keys){
   console.log(keys);
 
 
-  if(false) agent.add_key(key, "testcomm", function(err, out){
+  if(true) agent.add_key(fs.readFileSync("/home/fleurent/fleurent"), "testcomm", function(err, out){
+
+    agent.list_keys(function(err, keys){
+
+      console.log("Now keys are", keys);
+
+      agent.sign("8fdccfb6db6598c9fcf6c05e6bb8ddc3", new Buffer("hello"), function(err, sign) {
+          console.log("Signing is", err, sign);
+
+      });
+
+    });
+
     console.log('Key was added', err, out);
   });
 
@@ -23,7 +35,7 @@ agent.list_keys(function(err, keys){
 
   });
 
-  agent.sign("131", new Buffer("hello"), function(err, sign) {
+  if(false) agent.sign("131", new Buffer("hello"), function(err, sign) {
     console.log(err, sign);
 
   });
