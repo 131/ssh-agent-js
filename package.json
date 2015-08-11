@@ -14,10 +14,11 @@
   "author": "Francois Leurent <131.js@cloudyks.org>",
   "license": "ISC",
   "dependencies": {
-    "uclass": "~2.0.1",
-    "nyks": "~1.0.2",
-    "node-rsa": "~0.2.25",
+    "asn1": "0.2.2",
+    "duplexer": "^0.1.1",
     "node-jsbn": "*",
-    "asn1": "0.2.2"
+    "node-rsa": "~0.2.25",
+    "nyks": "~1.0.2",
+    "uclass": "~2.0.1"
   }
 }
