@@ -8,15 +8,17 @@ var BigInteger = require('node-jsbn');
 var ber = require('asn1').Ber;
 var pemme = require('nyks/crypt/pemme');
 
-var PROTOCOL  = require('./protocol.json');
-var read      = require('./_read');
-var write     = require('./_write');
+var PROTOCOL  = require('../lib/protocol.json');
+var read      = require('../lib/_read');
+var write     = require('../lib/_write');
 
-var PageantTransport = require('./transport/pageant');
-var SocketTransport = require('./transport/socket');
+var PageantTransport = require('../lib/transport/pageant');
+var SocketTransport = require('../lib/transport/socket');
 
 
 var Server = new Class({
+  Implements : [ require('uclass/events') ],
+
   Binds : ['_new_client', 'start', '_parse', 'sign'],
 
   keys_list  : {},
@@ -25,6 +27,10 @@ var Server = new Class({
 
     this.lnk = new SocketTransport();
     this.lnk = new PageantTransport();
+
+    this.on("sign", function(){
+      console.log("In signing stuffs");
+    });
   },
 
   start : function(){
@@ -78,6 +84,7 @@ var Server = new Class({
 
   list_keys_v2 : function(client, callback) {
     var self = this;
+    self.emit("list_keys");
 
     var respondIdentities = function() {
         var nb = Object.keys(self.keys_list).length;
@@ -109,6 +116,7 @@ var Server = new Class({
     signer.update(message);
     var sign = signer.sign(pemme(key.private, "RSA PRIVATE KEY"));
 
+    this.emit("sign", {fingerprint:fingerprint, comment:key.comment});
 
     var respondSigning = function(){
       var blob = write(Buffer.concat([
@@ -166,6 +174,8 @@ var Server = new Class({
     console.log(pemme(writer.buffer, "RSA PRIVATE KEY"));
     var fingerprint = md5(publicKey);
     console.log(pemme(publicKey, "PUBLIC KEY"), fingerprint);
+
+    this.emit("add_key", {comment: comment} );
 
     this.keys_list[fingerprint] = {public : publicKey, private : writer.buffer, comment : comment };
     return this._respond(client, PROTOCOL.SSH_AGENT_SUCCESS, null, callback);

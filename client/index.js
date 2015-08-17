@@ -1,3 +1,4 @@
+
 var fs = require('fs');
 var crypto = require('crypto');
 var net = require('net');
@@ -8,22 +9,24 @@ var openssh2pem = require('nyks/crypt/openssh2pem');
 var pemme = require('nyks/crypt/pemme');
 var NodeRSA = require('node-rsa');
 
-var read  = require('./_read');
-var write = require('./_write');
-var PROTOCOL = require('./protocol.json');
-
+var read  = require('../lib/_read');
+var write = require('../lib/_write');
+var PROTOCOL = require('../lib/protocol.json');
 
 
 var Agent = new Class({
   Binds : ['list_keys', 'sign', 'add_key', 'remove_key', 'remove_all_keys'],
 
   initialize : function(sock){
-    this.lnk = sock || process.env["SSH_AUTH_SOCK"];
+
+
+    this.lnk = { path :  sock || process.env["SSH_AUTH_SOCK"] };
+    this.lnk = { port : 8001 };
   },
 
   _request : function(getRequest, parseResponse, messageType, callback){
 
-    var client = net.connect({path : this.lnk}, function(){
+    var client = net.connect(this.lnk, function(){
       client.write(getRequest());
     });
 
