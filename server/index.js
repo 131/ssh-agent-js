@@ -1,48 +1,37 @@
-var crypto    = require('crypto');
-var fs        = require('fs');
-var Class     = require('uclass');
-var md5 = require('nyks/crypt/md5');
+"use strict";
 
-var tmppath   = require('nyks/fs/tmppath');
-var BigInteger = require('node-jsbn');
-var ber = require('asn1').Ber;
-var pemme = require('nyks/crypt/pemme');
+const crypto       = require('crypto');
+const EventEmitter = require('events').EventEmitter;
 
-var PROTOCOL  = require('../lib/protocol.json');
-var read      = require('../lib/_read');
-var write     = require('../lib/_write');
+const BigInteger = require('node-jsbn');
+const ber        = require('asn1').Ber;
+const pemme      = require('nyks/crypto/pemme');
+const md5        = require('nyks/crypto/md5');
 
-var PageantTransport = require('../lib/transport/pageant');
-var SocketTransport = require('../lib/transport/socket');
+const PROTOCOL  = require('../lib/protocol.json');
+const read      = require('../lib/_read');
+const write     = require('../lib/_write');
 
 
-var Server = new Class({
-  Implements : [ require('uclass/events') ],
 
-  Binds : ['_new_client', 'start', '_parse', 'sign'],
+class Server extends EventEmitter {
 
-  keys_list  : {},
-
-  initialize : function(){
-
-    this.lnk = new SocketTransport();
-    this.lnk = new PageantTransport();
+  constructor(){
+    super();
+    this.keys_list  = {};
 
     this.on("sign", function(){
       console.log("In signing stuffs");
     });
-  },
+  }
 
-  start : function(){
-    this.lnk.start(this._new_client);
-  },
-
-  _new_client : function(client) {
+  _new_client (client) {
     var self = this, traffic = new Buffer(0), length;
 
     var feed = function(buffer) {
       traffic = Buffer.concat([traffic, buffer]);
       console.log("Feeding for traffic", traffic);
+
       if(traffic.length >= length ) {
         self._parse(client, traffic);
         traffic = new Buffer(0);
@@ -52,7 +41,7 @@ var Server = new Class({
       }
     };
 
-    var init = function(buffer){
+    var init = function(buffer) {
       console.log("Init buffer", buffer);
       if(buffer.length < 4)
         throw "Invalid buffer";
@@ -70,19 +59,19 @@ var Server = new Class({
     client.once("end", function(){
       console.log("No data anymore");
     });
-  },
+  }
 
 
-  list_keys_v1 : function(client, callback) {
+  list_keys_v1 (client, callback) {
 
     var respondIdentities = function() {
         return write(0, "uint32");
     }
 
     return this._respond(client, PROTOCOL.SSH_AGENT_RSA_IDENTITIES_ANSWER, respondIdentities, callback);
-  },
+  }
 
-  list_keys_v2 : function(client, callback) {
+  list_keys_v2(client, callback) {
     var self = this;
     self.emit("list_keys");
 
@@ -101,9 +90,9 @@ var Server = new Class({
     }
 
     return this._respond(client, PROTOCOL.SSH2_AGENT_IDENTITIES_ANSWER, respondIdentities, callback);
-  },
+  }
 
-  sign : function(client, body, callback){
+  sign (client, body, callback) {
     var self = this;
 
     var key_blob = read(body, "string"),
@@ -128,10 +117,10 @@ var Server = new Class({
 
     return this._respond(client, PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, respondSigning, callback);
 
-  },
+  }
 
 
-  add_key : function(client, body, callback) {
+  add_key (client, body, callback) {
     var algo = read(body, "string").toString('ascii'),
         n = read(body, 'mpint'), 
         e = read(body, 'mpint'),
@@ -177,21 +166,26 @@ var Server = new Class({
 
     this.emit("add_key", {comment: comment} );
 
-    this.keys_list[fingerprint] = {public : publicKey, private : writer.buffer, comment : comment };
+    this.keys_list[fingerprint] = {
+        public : publicKey,
+        private : writer.buffer,
+        comment : comment,
+        algo    : algo,
+    };
     return this._respond(client, PROTOCOL.SSH_AGENT_SUCCESS, null, callback);
-  },
+  }
 
-  _respond : function(client, type, response, callback) {
+  _respond (client, type, response, callback) {
     var msg= [write(type, "uint8")];
     if(response) msg.push(response());
 
     var body =  write(Buffer.concat(msg), "string");
     console.log("responding with", body);
     client.write(body);
-  },
+  }
 
 
-  _parse : function(client, body) {
+  _parse (client, body) {
 
     var type = read(body, "uint8");
     console.log("Parsing" ,  body, "read ", type );
@@ -208,14 +202,8 @@ var Server = new Class({
     if(type == PROTOCOL.SSH2_AGENTC_SIGN_REQUEST)
       this.sign(client, body);
 
-  },
-
-});
+  }
+}
 
 
 module.exports = Server;
-
-
-
-
-

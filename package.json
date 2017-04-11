@@ -16,9 +16,9 @@
   "dependencies": {
     "asn1": "0.2.2",
     "duplexer": "^0.1.1",
-    "node-jsbn": "*",
-    "node-rsa": "~0.2.25",
-    "nyks": "~1.0.2",
-    "uclass": "~2.0.1"
-  }
+    "node-jsbn": "~0.1.1",
+    "node-rsa": "~0.4.2",
+    "nyks": "^3.17.1"
+  },
+  "devDependencies": {}
 }
