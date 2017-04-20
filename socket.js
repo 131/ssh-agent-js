@@ -3,7 +3,7 @@
 const net       = require('net');
 const fs       = require('fs');
 const Server = require('../server')
-
+const tmppath = require('nyks/fs/tmppath');
 class SocketTransport {
 
   constructor() {
@@ -22,7 +22,7 @@ class SocketTransport {
     //process.env['SSH_AUTH_SOCK'] = port;
 
     var port = 8001;
-    var port = "/tmp/agent";
+    var port = tmppath();
     if(fs.existsSync(port))
       fs.unlinkSync(port);
 
