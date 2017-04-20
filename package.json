@@ -14,7 +14,7 @@
   "author": "Francois Leurent <131.js@cloudyks.org>",
   "license": "ISC",
   "dependencies": {
-    "asn1": "0.2.2",
+    "asn1": "^0.2.2",
     "duplexer": "^0.1.1",
     "node-jsbn": "~0.1.1",
     "node-rsa": "~0.4.2",
