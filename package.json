@@ -19,7 +19,7 @@
     "node-jsbn": "~0.1.1",
     "node-rsa": "~0.4.2",
     "nyks": "^3.17.1",
-    "ssh-keychain": "^1.0.0"
+    "ssh-keychain": "^1.0.1"
   },
   "devDependencies": {}
 }

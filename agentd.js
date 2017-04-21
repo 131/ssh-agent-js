@@ -135,7 +135,7 @@ class SSHAgentD {
     writer.writeBuffer(coeff, 2);
     writer.endSequence();
 
-    this.keychain.add(writer.buffer);
+    this.keychain.add_key(writer.buffer);
 
     return this._respond(client, PROTOCOL.SSH_AGENT_SUCCESS, null, callback);
   }
