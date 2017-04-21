@@ -8,9 +8,9 @@ const ber        = require('asn1').Ber;
 const pemme      = require('nyks/crypto/pemme');
 const md5        = require('nyks/crypto/md5');
 
-const PROTOCOL  = require('../lib/protocol.json');
-const read      = require('../lib/_read');
-const write     = require('../lib/_write');
+const PROTOCOL  = require('./lib/protocol.json');
+const read      = require('./lib/_read');
+const write     = require('./lib/_write');
 
 
 
