@@ -1,20 +1,22 @@
 "use strict";
 
 const net       = require('net');
-const fs       = require('fs');
-const Server = require('../server')
-const tmppath = require('nyks/fs/tmppath');
+const fs        = require('fs');
+
+const tmppath  = require('nyks/fs/tmppath');
+
+const SSHAgentD = require('./')
+
 class SocketTransport {
 
   constructor() {
-    this.server = new Server();
+    this.ssh_agent = new SSHAgentD();
 
-
-    this.lnk = net.createServer(this.server._new_client.bind(this.server));
+    this.lnk = net.createServer(this.ssh_agent._new_client.bind(this.ssh_agent));
 
     process.on('cnyksEnd', () => {
       this.lnk.close();
-      console.log("Waiting for server to die");
+      console.log("Waiting for ssh_agent to die");
     });
   }
 

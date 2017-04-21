@@ -14,7 +14,7 @@ const write     = require('../lib/_write');
 
 
 
-class Server extends EventEmitter {
+class SSHAgentD extends EventEmitter {
 
   constructor(){
     super();
@@ -206,4 +206,4 @@ class Server extends EventEmitter {
 }
 
 
-module.exports = Server;
+module.exports = SSHAgentD;
