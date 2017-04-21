@@ -1,28 +1,20 @@
 "use strict";
 
-const crypto       = require('crypto');
-const EventEmitter = require('events').EventEmitter;
-
 const BigInteger = require('node-jsbn');
 const ber        = require('asn1').Ber;
-const pemme      = require('nyks/crypto/pemme');
+
 const md5        = require('nyks/crypto/md5');
+
 
 const PROTOCOL  = require('./lib/protocol.json');
 const read      = require('./lib/_read');
 const write     = require('./lib/_write');
 
 
+class SSHAgentD {
 
-class SSHAgentD extends EventEmitter {
-
-  constructor(){
-    super();
-    this.keys_list  = {};
-
-    this.on("sign", function(){
-      console.log("In signing stuffs");
-    });
+  constructor(keychain) {
+    this.keychain = keychain;
   }
 
   _new_client (client) {
@@ -56,10 +48,12 @@ class SSHAgentD extends EventEmitter {
     client.once("error",function(){
       console.log("Client disconnected");
     });
+
     client.once("end", function(){
       console.log("No data anymore");
     });
   }
+
 
 
   list_keys_v1 (client, callback) {
@@ -73,14 +67,12 @@ class SSHAgentD extends EventEmitter {
 
   list_keys_v2(client, callback) {
     var self = this;
-    self.emit("list_keys");
 
     var respondIdentities = function() {
-        var nb = Object.keys(self.keys_list).length;
-        var out = [write(nb, "uint32")];
+        var keys = self.keychain.keys,
+            out = [write(keys.length, "uint32")];
 
-        Object.keys(self.keys_list).forEach(function(key_id){
-          var key = self.keys_list[key_id];
+        keys.forEach( (key) => {
           out.push(write(key.public, "string"));
           out.push(write(key.comment, "string"));
         });
@@ -93,19 +85,11 @@ class SSHAgentD extends EventEmitter {
   }
 
   sign (client, body, callback) {
-    var self = this;
-
     var key_blob = read(body, "string"),
         message  = read(body, "string");
     var fingerprint = md5(key_blob);
-    console.log("Request for signing of key", fingerprint);
 
-    var key = self.keys_list[fingerprint];
-    var signer = crypto.createSign('RSA-SHA1');
-    signer.update(message);
-    var sign = signer.sign(pemme(key.private, "RSA PRIVATE KEY"));
-
-    this.emit("sign", {fingerprint:fingerprint, comment:key.comment});
+    var sign = this.keychain.sign(fingerprint, message);
 
     var respondSigning = function(){
       var blob = write(Buffer.concat([
@@ -116,9 +100,7 @@ class SSHAgentD extends EventEmitter {
     };
 
     return this._respond(client, PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, respondSigning, callback);
-
   }
-
 
   add_key (client, body, callback) {
     var algo = read(body, "string").toString('ascii'),
@@ -153,25 +135,8 @@ class SSHAgentD extends EventEmitter {
     writer.writeBuffer(coeff, 2);
     writer.endSequence();
 
-      //openssl public
-    var publicKey = Buffer.concat([
-      write("ssh-rsa", "string"),
-      write(e, "string"),
-      write(n, "string"),
-    ]);
+    this.keychain.add(writer.buffer);
 
-    console.log(pemme(writer.buffer, "RSA PRIVATE KEY"));
-    var fingerprint = md5(publicKey);
-    console.log(pemme(publicKey, "PUBLIC KEY"), fingerprint);
-
-    this.emit("add_key", {comment: comment} );
-
-    this.keys_list[fingerprint] = {
-        public : publicKey,
-        private : writer.buffer,
-        comment : comment,
-        algo    : algo,
-    };
     return this._respond(client, PROTOCOL.SSH_AGENT_SUCCESS, null, callback);
   }
 

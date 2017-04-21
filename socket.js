@@ -5,12 +5,17 @@ const fs        = require('fs');
 
 const tmppath  = require('nyks/fs/tmppath');
 
+const KeyChain  = require('ssh-keychain')
 const SSHAgentD = require('./')
 
 class SocketTransport {
 
   constructor() {
-    this.ssh_agent = new SSHAgentD();
+
+      //work with an empty vault
+    var vault = new KeyChain();
+
+    this.ssh_agent = new SSHAgentD(vault);
 
     this.lnk = net.createServer(this.ssh_agent._new_client.bind(this.ssh_agent));
 
