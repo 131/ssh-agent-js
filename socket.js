@@ -6,16 +6,16 @@ const net       = require('net');
 class SocketTransport {
   constructor(attach) {
     this.attach = attach;
-    var lnk = net.createServer(this.attach);
+    this.lnk = net.createServer(this.attach);
 
     process.on('cnyksEnd', () => {
       console.log("Shutting down agent");
-      lnk.close();
+      this.lnk.close();
     })
   }
 
   start(socket) {
-    lnk.listen(socket, function() {
+    this.lnk.listen(socket, function() {
       console.log("export SSH_AUTH_SOCK=%s", socket);
     });
   }
