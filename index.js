@@ -2,7 +2,7 @@
 
 const BigInteger = require('node-jsbn');
 const ber        = require('asn1').Ber;
-
+const debug      = require('debug')('ssh-agent');
 const md5        = require('nyks/crypto/md5');
 
 
@@ -22,23 +22,23 @@ class SSHAgentD {
 
     var feed = function(buffer) {
       traffic = Buffer.concat([traffic, buffer]);
-      console.log("Feeding for traffic", traffic);
+      debug("Feeding for traffic", traffic);
 
       if(traffic.length >= length ) {
         self._parse(client, traffic);
         traffic = new Buffer(0);
-        console.log("Cropped traffic is", traffic);
+        debug("Cropped traffic is", traffic);
         client.removeListener("data", feed);
         client.once("data", init);
       }
     };
 
     var init = function(buffer) {
-      console.log("Init buffer", buffer);
+      debug("Init buffer", buffer);
       if(buffer.length < 4)
         throw "Invalid buffer";
       length = read(buffer, "uint32");
-      console.log("New packet, lengh is", length);
+      debug("New packet, lengh is", length);
       client.on("data", feed);
       feed(buffer.slice(4));
     };
@@ -46,11 +46,11 @@ class SSHAgentD {
     client.once("data", init);
 
     client.once("error",function(){
-      console.log("Client disconnected");
+      debug("Client disconnected");
     });
 
     client.once("end", function(){
-      console.log("No data anymore");
+      debug("No data anymore");
     });
   }
 
@@ -77,7 +77,6 @@ class SSHAgentD {
           out.push(write(key.comment, "string"));
         });
 
-        console.log(out);
         return Buffer.concat(out);
     }
 
@@ -88,18 +87,23 @@ class SSHAgentD {
     var key_blob = read(body, "string"),
         message  = read(body, "string");
     var fingerprint = md5(key_blob);
+    try {
 
-    var sign = this.keychain.sign(fingerprint, message);
+      var sign = this.keychain.sign(fingerprint, message);
 
-    var respondSigning = function(){
-      var blob = write(Buffer.concat([
-        write("ssh-rsa", "string"),
-        write(sign, "string"),
-      ]), "string");
-      return blob;
-    };
+      var respondSigning = function(){
+        var blob = write(Buffer.concat([
+          write("ssh-rsa", "string"),
+          write(sign, "string"),
+        ]), "string");
+        return blob;
+      };
 
-    return this._respond(client, PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, respondSigning, callback);
+
+      return this._respond(client, PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, respondSigning, callback);
+    } catch(err) {
+      return this._respond(client, PROTOCOL.SSH_AGENT_FAILURE, null, callback);
+    }
   }
 
   add_key (client, body, callback) {
@@ -145,7 +149,7 @@ class SSHAgentD {
     if(response) msg.push(response());
 
     var body =  write(Buffer.concat(msg), "string");
-    console.log("responding with", body);
+    debug("responding with", body);
     client.write(body);
   }
 
@@ -153,7 +157,7 @@ class SSHAgentD {
   _parse (client, body) {
 
     var type = read(body, "uint8");
-    console.log("Parsing" ,  body, "read ", type );
+    debug("Parsing" ,  body, "read ", type );
 
     if(type == PROTOCOL.SSH_AGENTC_REQUEST_RSA_IDENTITIES)
       this.list_keys_v1(client);
