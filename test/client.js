@@ -25,7 +25,7 @@ describe("testing client (win32)", function() {
 
   before("Should start the agent server", function(done) {
     console.log("Getting ssh-agent server ready");
-    server = cp.spawn("ssh-agent", ["-D", "-a", agent_sock]);
+    server = cp.spawn("ssh-agent", ["-d", "-a", agent_sock]);
     console.log("Server is running at %s with pid %d", agent_sock, server.pid);
 
     server.stdout.once("data", () => done());
