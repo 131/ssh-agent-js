@@ -1,184 +1,163 @@
-"use strict";
+'use strict';
 
 const crypto = require('crypto');
-const net    = require('net');
-
 const NodeRSA = require('node-rsa');
 
-const md5         = require('nyks/crypt/md5');
-const openssh2pem = require('nyks/crypt/openssh2pem');
-const pemme       = require('nyks/crypt/pemme');
+const md5         = require('nyks/crypto/md5');
+const openssh2pem = require('nyks/crypto/openssh2pem');
+const pemme       = require('nyks/crypto/pemme');
+const sread       = require('nyks/stream/read');
 
 const read     = require('../lib/_read');
 const write    = require('../lib/_write');
 const PROTOCOL = require('../lib/protocol.json');
 
+const debug =  require('debug')('agent:client');
 
+const KEY_TYPE_RSA  = 'ssh-rsa';
 class Agent {
 
   constructor(sock) {
-
-    this.lnk = { path :  sock || process.env["SSH_AUTH_SOCK"] };
-    this.lnk = { port : 8001 };
+    this.lnk = sock;
   }
 
-  _request(messageType, getRequest, callback) {
+  async _request(requestType, messageType, payload) {
+    debug(`Sending request`, requestType);
+    let client = this.lnk;
 
-    var client = net.connect(this.lnk, function(){
-      client.write(getRequest());
+    try {
+      client.write(payload);
+      let data = await sread(client);
+
+      let len = read(data, 'uint32');
+      if(len !== data.length - 4)
+        throw `Expected length: ${len} but got: ${data.length}`;
+
+      let type = read(data, 'uint8');
+      if(type !== messageType)
+        throw `Expected message type: ${messageType} but got: ${type}`;
+
+      return data;
+    } catch(err) {
+      debug(`request failure`, err, payload);
+      throw `Failure in ${requestType}`;
+    }
+
+  }
+
+
+  async _lookup_key(key_id) {
+    let keys = await this.list_keys();
+
+    //search by key id or comment
+    let key = Object.values(keys).find((key) => {
+      return (key.comment == key_id || key.fingerprint == key_id || key.blob == key_id)
+        && key.type == KEY_TYPE_RSA;
     });
+    if(!key)
+      throw `Invalid key lookup`;
+    return key;
+  }
 
-    client.once('data', function (data) {
-      client.end();
-      
-      var len = read(data, "uint32");
-      if (len !== data.length - 4)
-        return callback(`Expected length: ${len} but got: ${data.length}`);
+  async add_key(keyData, comment) {
+    let tmp = new NodeRSA(keyData);
+    var key = tmp.exportKey('components');
+    var algo = 'ssh-rsa';
 
-      var type = read(data, "uint8");
-      if (type !== messageType)
-        return callback(`Expected message type: ${messageType} but got: ${type}`);
+    var publicKey = Buffer.concat([write(algo, 'string'), write(key.e, 'mpint'), write(key.n, 'mpint')]);
+    var fingerprint = md5(publicKey);     //openssl public
 
-      return callback(null, data);
-    });
+    var packet = write(Buffer.concat([
+      write(PROTOCOL.SSH2_AGENTC_ADD_IDENTITY, 'uint8'),
+      write(algo, 'string'),
+      write(key.n, 'mpint'),
+      write(key.e, 'mpint'),
+      write(key.d, 'mpint'),
+      write(key.coeff, 'mpint'),
+      write(key.p, 'mpint'),
+      write(key.q, 'mpint'),
+      write(comment || '', 'string'),
+    ]), 'string');
 
-    client.on('error', callback);
+    return this._request(`add_key ${fingerprint}`, PROTOCOL.SSH_AGENT_SUCCESS, packet);
+  }
+
+  async remove_all_keys() {
+    let packet = write(PROTOCOL.SSH2_AGENTC_REMOVE_ALL_IDENTITIES, 'string');
+    return this._request('remove_all_keys', PROTOCOL.SSH_AGENT_SUCCESS, packet);
+  }
+
+  async remove_key(key_id) {
+    let key = await this._lookup_key(key_id);
+
+    var packet = write(Buffer.concat([
+      write(PROTOCOL.SSH2_AGENTC_REMOVE_IDENTITY, 'uint8'),
+      write(key.blob, 'string'),
+    ]), 'string');
+
+    return this._request('remove_key', PROTOCOL.SSH_AGENT_SUCCESS, packet);
   }
 
 
-  add_key(keyData, comment, callback) {
-    var key = (new NodeRSA(keyData)).keyPair;
+  async list_keys() {
+    let packet = write(PROTOCOL.SSH2_AGENTC_REQUEST_IDENTITIES, 'string');
+    let response = await this._request('list_keys', PROTOCOL.SSH2_AGENT_IDENTITIES_ANSWER, packet);
 
-    function addRequest() {
-      var algo = "ssh-rsa";
-      var packet = write(Buffer.concat([
-          write(PROTOCOL.SSH2_AGENTC_ADD_IDENTITY, "uint8"),
-          write(algo, "string"),
-          write(key['n'].toBuffer(), 'mpint'),
-          write(new Buffer([key['e']]), 'mpint'),
-          write(key['d'].toBuffer(), 'mpint'),
-          write(key['coeff'].toBuffer(), 'mpint'),
-          write(key['p'].toBuffer(), 'mpint'),
-          write(key['q'].toBuffer(), 'mpint'),
-          write(comment || "", 'string'),
-      ]), "string");
+    var numKeys = read(response, 'uint32');
 
-      return packet;
-    }
-  
-    return this._request(PROTOCOL.SSH_AGENT_SUCCESS, addRequest, callback);
-  }
+    var keys = {};
+    for(var i = 0; i < numKeys; i++) {
+      let key     = read(response, 'string');
+      let fp      = md5(key);
 
-  remove_all_keys(callback) {
+      let comment = read(response, 'string');
+      let type    = read(key, 'string');
 
-    var removeRequest = function() {
-      return write(PROTOCOL.SSH2_AGENTC_REMOVE_ALL_IDENTITIES, "string");
+      keys[fp] = {
+        type : type.toString('ascii'),
+        fingerprint : fp,
+        ssh_key : key.toString('base64'),
+        comment : comment.toString('utf8'),
+        blob : key
+      };
     }
 
-    return this._request(PROTOCOL.SSH_AGENT_SUCCESS, removeRequest, callback);
-  }
-
-  remove_key(pubkey, callback) {
-
-    var removeRequest = function() {
-     var packet = write(Buffer.concat([
-          write(PROTOCOL.SSH2_AGENTC_REMOVE_IDENTITY, "uint8"),
-          write(pubkey, "string"),
-      ]), "string");
-      return packet;
-    }
-
-    return this._request(PROTOCOL.SSH_AGENT_SUCCESS, removeRequest, callback);
+    return keys;
   }
 
 
-  list_keys(callback) {
+  async sign(key_id, message) {
 
-    var requestIdentities = function() {
-      return write(PROTOCOL.SSH2_AGENTC_REQUEST_IDENTITIES, "string");
-    }
+    let key = await this._lookup_key(key_id);
 
-    var identitiesAnswer = function(err, response) {
-      if(err)
-        return callback(err);
+    var packet = write(Buffer.concat([
+      write(PROTOCOL.SSH2_AGENTC_SIGN_REQUEST, 'uint8'),
+      write(key.blob, 'string'),
+      write(message, 'string'),
+      write(0, 'uint32'),
+    ]), 'string');
 
-      var numKeys = read(response, "uint32");
+    let response = await this._request('sign', PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, packet);
 
-      var keys = {};
-      for (var i = 0; i < numKeys; i++) {
-        var key     = read(response, "string");
-        var comment = read(response, "string");
-        var type    = read(key, "string");
-        var fingerprint = md5(key);
+    //now verify
+    let blob = read(response, 'string');
 
-        keys[fingerprint] = {
-          type: type.toString('ascii'),
-          fingerprint : fingerprint,
-          ssh_key: key.toString('base64'),
-          comment: comment.toString('utf8'),
-          blob: key
-        };
-      }
+    let type =  read(blob, 'string');
+    let signature = read(blob, 'string');
 
-      return callback(null, keys);
-    }
+    key = pemme(openssh2pem(key.ssh_key), 'PUBLIC KEY');
 
-    return this._request(PROTOCOL.SSH2_AGENT_IDENTITIES_ANSWER, requestIdentities, identitiesAnswer);
-  }
+    var verifier = crypto.createVerify('RSA-SHA1');
+    verifier.update(message);
+    var success = verifier.verify(key, signature);
+    if(!success)
+      throw `Cannot verify signature`;
 
-
-  sign(key_id, message, callback) {
-    var self = this, type = 'ssh-rsa';
-
-    this.list_keys(function(err, keys) {
-
-        //search by key id or comment
-      if(! (key_id in keys))
-        Object.keys(keys).forEach(function(k){ if (keys[k].comment == key_id) key_id = k });
-
-      var key = keys[key_id];
-
-      if(!key)
-        return callback("Invalid key");
-
-      if(key.type != type)
-        return callback("Unsupported key format");
-
-      function signRequest() {
-        var packet = write(Buffer.concat([
-            write(PROTOCOL.SSH2_AGENTC_SIGN_REQUEST, "uint8"),
-            write(key.blob, "string"),
-            write(message, "string"),
-            write(0, "uint8"),
-        ]), "string");
-        return packet;
-      }
-
-      function signatureResponse(err, response) {
-        if(err)
-          return callback(err);
-
-        var blob = read(response, "string");
-        var type =  read(blob, "string");
-        var signature = read(blob, "string");
-
-        key = pemme(openssh2pem(key.ssh_key), "PUBLIC KEY");
-
-        var verifier = crypto.createVerify('RSA-SHA1');
-        verifier.update(message);
-        var success = verifier.verify(key, signature);
-        if(!success)
-          return callback("Cannot verify signature");
-
-        return callback(null, {
-          type: type.toString('ascii'),
-          signature: signature.toString('base64'),
-          _raw: signature
-        });
-      }
-
-      return self._request(PROTOCOL.SSH2_AGENT_SIGN_RESPONSE, signRequest, signatureResponse);
-    });
+    return {
+      type : type.toString('ascii'),
+      signature : signature.toString('base64'),
+      _raw : signature
+    };
   }
 }
 
