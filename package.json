@@ -1,6 +1,6 @@
 {
   "name": "ssh-agent-js",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "ssh-agent-js",
   "main": "server/index.js",
   "keywords": [
