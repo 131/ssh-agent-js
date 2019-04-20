@@ -28,7 +28,8 @@ describe("testing client (win32)", function() {
     server = cp.spawn("ssh-agent", ["-d", "-a", agent_sock]);
     console.log("Server is running at %s with pid %d", agent_sock, server.pid);
 
-    server.stdout.once("data", () => done());
+    //server.stdout.once("data", () => done());
+    server.stderr.once("data", () => done());
     server.stderr.pipe(process.stderr);
   });
 
