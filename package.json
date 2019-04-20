@@ -32,5 +32,13 @@
     "expect.js": "^0.3.1",
     "mocha": "^3.1.2",
     "nyc": "^13.0.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/131/ssh-agent-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/131/ssh-agent-js/issues"
+  },
+  "homepage": "https://github.com/131/ssh-agent-js#readme"
 }
